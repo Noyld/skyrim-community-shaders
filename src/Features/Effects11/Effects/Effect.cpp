@@ -227,6 +227,7 @@ bool Effect::Apply()
 void Effect::Unload()
 {
 	effect = nullptr;
+	isEncoded = false;
 
 	techniques.clear();
 	variables.clear();
@@ -280,7 +281,8 @@ bool Effect::LoadFXFile()
 	mainFile.close();
 	uiDefines.clear();
 
-	if (ENBExtender::IsEncodedEffect(std::span<const char>(sourceCode.data(), sourceCode.size()))) {
+	isEncoded = ENBExtender::IsEncodedEffect(std::span<const char>(sourceCode.data(), sourceCode.size()));
+	if (isEncoded) {
 		winrt::com_ptr<ID3DBlob> compiled, diagnostics;
 		std::string failure;
 		const auto hr = ENBExtender::CompileEncodedEffect(filePath, compiled.put(), diagnostics.put(), failure);
@@ -713,6 +715,10 @@ void Effect::LoadUIVariables()
 		D3DX11_EFFECT_VARIABLE_DESC varDesc;
 		if (FAILED(variable->GetDesc(&varDesc)))
 			continue;
+		// Encoded effects have no readable source order. The compiled variable order
+		// is the only available fallback; plain FX retains its parsed source order.
+		if (varDesc.Name)
+			sourceOrderMap.try_emplace(varDesc.Name, static_cast<int>(i));
 
 		D3DX11_EFFECT_TYPE_DESC typeDesc;
 		auto effectType = variable->GetType();

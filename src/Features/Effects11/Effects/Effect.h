@@ -29,6 +29,7 @@ public:
 	virtual void Unload();  // Clear all resources
 
 	bool IsCompiled() const { return filePresent && errors.empty(); }
+	bool IsEncoded() const { return isEncoded; }
 	bool IsFilePresent() const { return filePresent; }
 	const std::vector<std::string>& GetErrors() const { return errors; }
 
@@ -275,6 +276,7 @@ protected:
 
 private:
 	bool LoadFXFile();
+	bool isEncoded = false;
 
 	std::unordered_map<std::string, ID3DX11EffectVariable*> variableCache;
 	std::unordered_map<std::string, TextureManager::Texture*> commonTexturePointerCache;

@@ -983,11 +983,22 @@ void EffectManager::RenderEffectsList()
 			compiledEffects.push_back(effect);
 
 #ifdef ENABLE_ENB_EXTENDER
-	if (!compiledEffects.empty())
+	bool hasEncodedEffect = false;
+	for (auto* effect : compiledEffects)
+		hasEncodedEffect |= effect->IsEncoded();
+	if (hasEncodedEffect) {
+		// ENB presents the preset's shader controls as one tree, not one tree per file.
+		ExtendedEffect::RenderMergedUI(compiledEffects);
+	} else if (!compiledEffects.empty()) {
 		ExtendedEffect::RenderMergedUI(compiledEffects, UITree::FilterMode::TopLevelOnly);
+	}
 #endif
 
 	for (auto* effect : compiledEffects) {
+#ifdef ENABLE_ENB_EXTENDER
+		if (hasEncodedEffect)
+			break;
+#endif
 		if (ImGui::TreeNodeEx(effect->GetName().c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
 #ifdef ENABLE_ENB_EXTENDER
 			Effect* self = effect;

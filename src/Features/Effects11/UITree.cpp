@@ -106,7 +106,8 @@ namespace UITree
 				if (filter == FilterMode::NonTopLevelOnly && var.isTopLevel)
 					continue;
 
-				if (!seenItems.insert(var.name).second)
+				const auto itemKey = effect->IsEncoded() ? effect->GetName() + "::" + var.name : var.name;
+				if (!seenItems.insert(itemKey).second)
 					continue;
 
 				GroupNode* node = !var.group.empty() ? TraverseGroupPath(root, var.group, meta) : &root;
@@ -125,7 +126,8 @@ namespace UITree
 				if (filter == FilterMode::NonTopLevelOnly && sep.isTopLevel)
 					continue;
 
-				if (!sep.name.empty() && !seenItems.insert(sep.name).second)
+				const auto itemKey = effect->IsEncoded() ? effect->GetName() + "::" + sep.name : sep.name;
+				if (!sep.name.empty() && !seenItems.insert(itemKey).second)
 					continue;
 
 				GroupNode* node = sep.isTopLevel ? &root
