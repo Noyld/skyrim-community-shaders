@@ -1,6 +1,7 @@
 ﻿#include "ENBExtender.h"
 
 #include <d3dcompiler.h>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <unordered_set>
@@ -9,6 +10,74 @@
 
 namespace ENBExtender
 {
+	namespace
+	{
+		// Values and export name are part of the public ENB Extender 1.6 API example.
+		enum class CompileFileIndex : uint32_t
+		{
+			None,
+			PreProcessing,
+			DepthOfField,
+			Bloom,
+			Lens,
+			Adaptation,
+			MainProcessing,
+			PostProcessing,
+			SunSprite,
+			Underwater
+		};
+
+		using CompileFunction = HRESULT (*)(CompileFileIndex, ID3DBlob**, ID3DBlob**);
+
+		CompileFileIndex GetCompileIndex(const std::string& name)
+		{
+			if (name == "enbbloom.fx") return CompileFileIndex::Bloom;
+			if (name == "enblens.fx") return CompileFileIndex::Lens;
+			if (name == "enbadaptation.fx") return CompileFileIndex::Adaptation;
+			if (name == "enbeffect.fx") return CompileFileIndex::MainProcessing;
+			if (name == "enbeffectpostpass.fx") return CompileFileIndex::PostProcessing;
+			return CompileFileIndex::None;
+		}
+	}
+
+	bool IsEncodedEffect(std::span<const char> source)
+	{
+		return source.size() >= 5 && std::memcmp(source.data(), "KIEFX", 5) == 0;
+	}
+
+	HRESULT CompileEncodedEffect(const std::filesystem::path& effectPath, ID3DBlob** code, ID3DBlob** errors, std::string& failure)
+	{
+		const auto effectName = effectPath.filename().string();
+		const auto index = GetCompileIndex(effectName);
+		if (index == CompileFileIndex::None) {
+			failure = "No ENB Extender compiler index for " + effectName;
+			return E_INVALIDARG;
+		}
+		// ENBExt_Compile selects its source by index from the game's root enbseries
+		// directory. Refuse a Data-folder preset rather than return a different preset's blob.
+		if (effectPath.parent_path().lexically_normal() != std::filesystem::absolute("enbseries").lexically_normal()) {
+			failure = "ENB Extender compiles encoded effects only from the game's root enbseries directory";
+			return E_INVALIDARG;
+		}
+
+		const auto module = GetModuleHandleW(L"KiENBExtender");
+		if (!module) {
+			failure = "Encoded effect requires ENB Extender 1.6 or newer and KiLoader";
+			return HRESULT_FROM_WIN32(ERROR_MOD_NOT_FOUND);
+		}
+
+		const auto compile = reinterpret_cast<CompileFunction>(GetProcAddress(module, "ENBExt_Compile"));
+		if (!compile) {
+			failure = "Installed ENB Extender does not expose ENBExt_Compile (requires 1.6 or newer)";
+			return HRESULT_FROM_WIN32(ERROR_PROC_NOT_FOUND);
+		}
+
+		const auto result = compile(index, code, errors);
+		if (FAILED(result))
+			failure = "ENB Extender failed to compile " + effectName;
+		return result;
+	}
+
 	static bool IsTruthy(const std::string& s)
 	{
 		return !s.empty() && s != "0" && s != "false";

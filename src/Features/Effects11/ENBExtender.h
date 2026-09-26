@@ -11,6 +11,11 @@
 
 namespace ENBExtender
 {
+	// The Extender 1.6 compiler API is published as an optional developer example.
+	// This adapter only uses its exported ABI; encoded shader contents remain opaque.
+	bool IsEncodedEffect(std::span<const char> source);
+	HRESULT CompileEncodedEffect(const std::filesystem::path& effectPath, ID3DBlob** code, ID3DBlob** errors, std::string& failure);
+
 	// Shared helpers
 	int SafeStoi(const std::string& s, int fallback = 0);
 	float SafeStof(const std::string& s, float fallback = 0.0f);

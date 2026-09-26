@@ -278,6 +278,33 @@ bool Effect::LoadFXFile()
 		return false;
 	}
 	mainFile.close();
+	uiDefines.clear();
+
+	if (ENBExtender::IsEncodedEffect(std::span<const char>(sourceCode.data(), sourceCode.size()))) {
+		winrt::com_ptr<ID3DBlob> compiled, diagnostics;
+		std::string failure;
+		const auto hr = ENBExtender::CompileEncodedEffect(filePath, compiled.put(), diagnostics.put(), failure);
+		if (FAILED(hr) || !compiled) {
+			if (diagnostics && diagnostics->GetBufferSize() > 0)
+				failure += ": " + std::string(static_cast<const char*>(diagnostics->GetBufferPointer()), diagnostics->GetBufferSize());
+			if (failure.empty())
+				failure = "ENB Extender returned no compiled effect";
+			errors.push_back(failure);
+			return false;
+		}
+		if (FAILED(D3DX11CreateEffectFromMemory(compiled->GetBufferPointer(),
+				compiled->GetBufferSize(), 0, globals::d3d::device, effect.put()))) {
+			errors.push_back("Failed to create effect from ENB Extender's compiled shader");
+			return false;
+		}
+		EnumerateAllVariables();
+		SetupCustomTextures();
+		LoadTechniques();
+		LoadUITechniques();
+		LoadUIVariables();
+		logger::info("[EFFECTS11] Loaded encoded effect through ENB Extender: {}", filePath.string());
+		return true;
+	}
 
 
 	auto enbseriesPath = filePath.parent_path();
@@ -286,7 +313,6 @@ bool Effect::LoadFXFile()
 	std::string iniSection = GetName();
 	std::transform(iniSection.begin(), iniSection.end(), iniSection.begin(), ::toupper);
 
-	uiDefines.clear();
 	Util::ShaderPatches::Apply(GetName().c_str(), sourceCode);
 	ENBExtender::ConvertExtenderSyntax(sourceCode, enbseriesPath, uiDefines, iniPathStr, iniSection);
 
