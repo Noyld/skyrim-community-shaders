@@ -636,18 +636,10 @@ void EffectManager::UpdateCommonData()
 
 	// Update weather
 	{
-		// Strip plugin index (2 leftmost digits) from form IDs
-		auto stripPluginIndex = [](uint32_t formID) -> uint32_t {
-			return formID & 0x00FFFFFF;  // Keep only the lower 6 hex digits
-		};
-
 		if (sky) {
 			auto& weatherManager = WeatherManager::GetSingleton();
-			uint32_t currentID = sky->currentWeather ? stripPluginIndex(sky->currentWeather->formID) : 0;
-			uint32_t lastID = sky->lastWeather ? stripPluginIndex(sky->lastWeather->formID) : 0;
-
-			commonData.weather[0] = static_cast<float>(weatherManager.GetEffectiveWeatherID(currentID));
-			commonData.weather[1] = static_cast<float>(weatherManager.GetEffectiveWeatherID(lastID));
+			commonData.weather[0] = static_cast<float>(weatherManager.GetEffectiveWeatherID(sky->currentWeather));
+			commonData.weather[1] = static_cast<float>(weatherManager.GetEffectiveWeatherID(sky->lastWeather));
 			commonData.weather[2] = sky->currentWeatherPct;
 			commonData.weather[3] = sky->currentGameHour;
 		}

@@ -715,6 +715,24 @@ namespace ENBExtender
 		}
 	}
 
+	static void NormalizeEncodedUIName(Effect::UIVariable& uiVar, const Effect& effect)
+	{
+		if (!effect.IsEncoded())
+			return;
+
+		// The public compiler can expose ENB Extender's full UI identifier as
+		// UIName (for example "CG.HDR.|- Day - Exposure"). Recover its group and
+		// leaf label so the menu and time-of-day suffix parser see the same value
+		// that native ENB presents, while retaining the full INI/binding key.
+		const auto separator = uiVar.displayName.rfind(".|");
+		if (separator == std::string::npos || separator == 0)
+			return;
+		if (uiVar.uniqueName.empty())
+			uiVar.uniqueName = uiVar.displayName;
+		uiVar.group = uiVar.displayName.substr(0, separator);
+		uiVar.displayName.erase(0, separator + 1);
+	}
+
 	// CreateUIVariable — consolidated annotation reading for compiled effect variables
 
 	bool CreateUIVariable(Effect::UIVariable& out, ID3DX11EffectVariable* variable,
@@ -769,6 +787,7 @@ namespace ENBExtender
 		}
 
 		ApplyAnnotations(out, variable, groupStack, effect);
+		NormalizeEncodedUIName(out, effect);
 		if (out.isHidden)
 			return false;
 
@@ -836,6 +855,7 @@ namespace ENBExtender
 		labelVar.displayName = labelText;
 		labelVar.isLabel = true;
 		ApplyAnnotations(labelVar, variable, groupStack, effect);
+		NormalizeEncodedUIName(labelVar, effect);
 		if (!labelVar.isHidden)
 			effect.uiVariables.push_back(labelVar);
 		return true;

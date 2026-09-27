@@ -61,6 +61,13 @@ void TextureManager::CreateCommonTextures()
 
 	commonTextureCache.insert({ "TextureAdaptation", CreateTexture(1, 1, DXGI_FORMAT_R32_FLOAT, "TextureManager::TextureAdaptation") });
 	commonTextureCache.insert({ "TextureAdaptationSwap", CreateTexture(1, 1, DXGI_FORMAT_R32_FLOAT, "TextureManager::TextureAdaptationSwap") });
+	// Both textures can be read as the previous frame before the adaptation pass has
+	// written to them. Start from a neutral exposure instead of undefined GPU data.
+	constexpr float initialAdaptation[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+	for (const char* name : { "TextureAdaptation", "TextureAdaptationSwap" }) {
+		if (auto* texture = GetCommonTexture(name))
+			globals::d3d::context->ClearRenderTargetView(texture->rtv.get(), initialAdaptation);
+	}
 
 	// Create fixed-size render targets for bloom/lens
 	std::vector<std::pair<std::string, UINT>> fixedSizes = {

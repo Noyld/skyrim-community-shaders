@@ -4,8 +4,31 @@
 #include "PresetManager.h"
 #include "SettingManager.h"
 #include <Windows.h>
+#include <algorithm>
+#include <cctype>
+#include <cstring>
 #include <filesystem>
 #include <sstream>
+
+namespace
+{
+	std::string Lowercase(std::string value)
+	{
+		std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+		return value;
+	}
+
+	std::string WeatherClassification(const RE::TESWeather* weather)
+	{
+		using Flag = RE::TESWeather::WeatherDataFlag;
+		const auto flags = weather->data.flags;
+		if (flags.any(Flag::kPleasant)) return "clear";
+		if (flags.any(Flag::kCloudy)) return "cloudy";
+		if (flags.any(Flag::kRainy)) return "rainy";
+		if (flags.any(Flag::kSnow)) return "snowy";
+		return {};
+	}
+}
 
 WeatherManager& WeatherManager::GetSingleton()
 {
@@ -17,6 +40,7 @@ void WeatherManager::Initialize()
 {
 	LoadWeatherList();
 	LoadLocationWeather();
+	LoadWeatherRemaps();
 }
 
 void WeatherManager::LoadWeatherList()
@@ -267,6 +291,71 @@ uint32_t WeatherManager::GetEffectiveWeatherID(uint32_t actualWeatherID)
 	}
 
 	return actualWeatherID;
+}
+
+void WeatherManager::LoadWeatherRemaps()
+{
+	weatherRemaps.clear();
+	const auto path = PresetManager::GetSingleton().GetENBSeriesPath() / "_remapweather.ini";
+	if (!std::filesystem::exists(path))
+		return;
+
+	const auto pathString = path.string();
+	std::vector<char> sections(32768);
+	const DWORD count = GetPrivateProfileSectionNamesA(sections.data(), static_cast<DWORD>(sections.size()), pathString.c_str());
+	if (count == 0 || count >= sections.size() - 2) {
+		logger::warn("[WeatherManager] Could not read weather remaps from {}", pathString);
+		return;
+	}
+
+	for (const char* section = sections.data(); *section; section += std::strlen(section) + 1) {
+		std::string key(section);
+		if (const auto suffix = key.find('_'); suffix != std::string::npos)
+			key.resize(suffix);
+		WeatherRemap remap;
+		try {
+			remap.targetID = ParseHexID(key);
+		} catch (...) {
+			continue;
+		}
+		if (!remap.targetID)
+			continue;
+
+		char value[256]{};
+		GetPrivateProfileStringA(section, "WeatherNameIs", "", value, sizeof(value), pathString.c_str());
+		remap.nameIs = Lowercase(value);
+		GetPrivateProfileStringA(section, "WeatherNameContains", "", value, sizeof(value), pathString.c_str());
+		remap.nameContains = Lowercase(value);
+		GetPrivateProfileStringA(section, "WeatherClassification", "", value, sizeof(value), pathString.c_str());
+		remap.classification = Lowercase(value);
+		if (!remap.nameIs.empty() || !remap.nameContains.empty() || !remap.classification.empty())
+			weatherRemaps.push_back(std::move(remap));
+	}
+	logger::info("[WeatherManager] Loaded {} name/classification weather remaps", weatherRemaps.size());
+}
+
+uint32_t WeatherManager::GetEffectiveWeatherID(RE::TESWeather* weather)
+{
+	if (!weather)
+		return 0;
+
+	const uint32_t actualID = weather->formID & 0x00FFFFFF;
+	const uint32_t locationID = GetEffectiveWeatherID(actualID);
+	if (locationID != actualID)
+		return locationID;
+	if (weatherIDMap.contains(actualID))
+		return actualID;
+
+	const char* editorID = weather->GetFormEditorID();
+	const auto name = editorID ? Lowercase(editorID) : std::string{};
+	const auto classification = WeatherClassification(weather);
+	for (const auto& remap : weatherRemaps) {
+		if ((!remap.nameIs.empty() && name == remap.nameIs) ||
+			(!remap.nameContains.empty() && name.find(remap.nameContains) != std::string::npos) ||
+			(!remap.classification.empty() && classification == remap.classification))
+			return remap.targetID;
+	}
+	return actualID;
 }
 
 std::unordered_map<std::string, std::string> WeatherManager::GetWeatherFiles() const
