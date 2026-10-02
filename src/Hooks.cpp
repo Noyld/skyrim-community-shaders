@@ -1022,8 +1022,10 @@ namespace Hooks
 		logger::info("Hooking BSGraphics::Renderer::InitD3D");
 		stl::write_thunk_call<BSGraphics_Renderer_Init_InitD3D>(REL::RelocationID(75595, 77226).address() + REL::Relocate(0x50, 0x2BC));
 
-		logger::info("Hooking WndProcHandler");
-		stl::write_thunk_call<RegisterClassA_Hook, 6>(REL::VariantID(75591, 77226, 0xDC4B90).address() + REL::VariantOffset(0x8E, 0x15C, 0x99).offset());
+		// Proton/Wine workaround: do not replace the game window procedure.
+		// On Proton 10/11 with Skyrim 1.7.104 this hook can race early window initialization
+		// and crash in SkyrimSE.exe before shader compilation begins.
+		logger::info("Skipping WndProcHandler hook (Proton compatibility workaround)");
 
 		logger::info("Hooking BSShaderRenderTargets::Create");
 		stl::detour_thunk<BSShaderRenderTargets_Create>(REL::RelocationID(100458, 107175));
