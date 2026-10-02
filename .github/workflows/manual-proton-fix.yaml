@@ -1,0 +1,18 @@
+name: Build Proton WndProc Fix
+on:
+  workflow_dispatch:
+  push:
+    branches: [proton-wndproc-fix]
+permissions:
+  contents: read
+jobs:
+  build:
+    uses: ./.github/workflows/_shared-build.yaml
+    with:
+      ref: ${{ github.sha }}
+      repository: ${{ github.repository }}
+      run-cpp: true
+      run-shader-validation: false
+      hlsl-should-build: "false"
+      cache-key-suffix: "proton-wndproc-v1"
+      cmake-preset: PR
