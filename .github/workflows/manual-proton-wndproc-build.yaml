@@ -1,0 +1,19 @@
+name: Build Proton WndProc Fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/_shared-build.yaml
+    with:
+      ref: proton-wndproc-fix
+      repository: Noyld/skyrim-community-shaders
+      run-cpp: true
+      run-shader-validation: false
+      hlsl-should-build: "false"
+      cache-key-suffix: "proton-wndproc-v1"
+      cmake-preset: PR
